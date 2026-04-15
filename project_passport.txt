@@ -47,6 +47,10 @@
 * **Cross-Validation:** Мы не просто один раз тестируем модель, а режем данные на куски и прогоняем много раз. Это доказывает комиссии, что наш результат — не случайность.
 * **SHAP:** ML — это черный ящик. SHAP — это фонарик. Он строит красивые графики, где видно: "Ага, эта компания обанкротилась, потому что у нее упал Cash Flow". Без SHAP комиссия скажет: "Ваш ML — это магия, мы ему не верим".
 
+Hypothesis 1 (H1): Ensemble ML models (Random Forest, XGBoost) yield higher predictive accuracy (ROC-AUC) for tech companies; however, traditional Logistic Regression demonstrates higher stability and less susceptibility to overfitting on low-default samples.
+Hypothesis 2 (H2): Liquidity metrics and innovation capacity (Intangible Assets) hold significantly higher predictive weight in the tech sector than traditional financial leverage ratios.
+Hypothesis 3 (H3): The risk profile of IT companies is highly dependent on the local market: in economies with expensive capital (Russia), liquidity deficit is the primary default predictor, whereas in markets with developed institutional support (China), operational profitability is paramount.
+
 Thesis Structural Blueprint
 Thesis Title: Assessment of Financial Stability for Technology Companies in Selected Emerging Markets (Evidence from Russia and China) Using Machine Learning Models
 FRONT MATTER

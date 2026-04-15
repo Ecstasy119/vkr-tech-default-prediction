@@ -1,0 +1,4 @@
+﻿Model,ROC test K=1,ROC test K=2,PR test K=1,PR test K=2,ΔROC K=1,ΔROC K=2
+Logistic Regression,0.837,0.8352,0.114,0.1355,0.0416,0.0279
+Random Forest,0.8614,0.8558,0.0851,0.086,0.1383,0.144
+XGBoost,0.8833,0.8439,0.0642,0.1267,0.1164,0.1559

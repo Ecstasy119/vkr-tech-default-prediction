@@ -1,4 +1,4 @@
 ﻿Model,ROC-AUC test mean,ROC-AUC test std,PR-AUC test mean,PR-AUC test std,ΔROC (train−test),ΔPR (train−test)
-Logistic Regression,0.8514,0.0168,0.0597,0.0149,0.0247,-0.0047
-Random Forest,0.8708,0.024,0.0455,0.0121,0.1288,0.7321
-XGBoost,0.8538,0.0111,0.0434,0.0242,0.1459,0.8026
+Logistic Regression,0.8426,0.0313,0.0771,0.0094,0.0178,-0.0018
+Random Forest,0.8769,0.0327,0.0946,0.0239,0.1229,0.8187
+XGBoost,0.845,0.0173,0.0735,0.0139,0.1548,0.868

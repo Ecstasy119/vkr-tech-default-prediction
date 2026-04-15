@@ -1,0 +1,3 @@
+﻿Country,TTC ROC-AUC train,TTC ROC-AUC test,TTC PR-AUC train,TTC PR-AUC test,PR baseline (prevalence)
+Russia,0.8585,0.8291,0.0588,0.0888,0.0043
+China,0.9974,1.0,0.6026,1.0,0.0029

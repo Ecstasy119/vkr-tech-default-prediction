@@ -1,0 +1,4 @@
+﻿Rank,Russia feature,Russia group,Russia |SHAP|,China feature,China group,China |SHAP|
+1,cash_to_cl,Liquidity,1.0597,intangibles_to_assets,Innovation,3.2007
+2,debt_to_assets,Leverage,0.7787,log_revenue,Size,1.9039
+3,log_assets,Size,0.7537,net_margin,Profitability,1.0619
