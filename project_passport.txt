@@ -1,0 +1,102 @@
+1. Тема и главная идея работы
+Что делаем: Мы оцениваем вероятность дефолта (банкротства) технологических (IT) компаний с помощью алгоритмов машинного обучения (Machine Learning).
+В чем проблема (Зачем это нужно): Классические банковские модели оценки риска (например, модель Альтмана) создавались для заводов и фабрик. Они смотрят на наличие "твердых" залогов (станки, здания). У современных IT-компаний этого нет (модель asset-light). Их главная ценность — это код, патенты, мозги (нематериальные активы) и наличие кэша на счетах. Старые модели для них не работают.
+Как решаем: Мы строим современные ML-модели (Logistic Regression, Random Forest, XGBoost), которые способны уловить специфические, нелинейные факторы риска именно для IT-сектора. А чтобы объяснить результаты моделей (ML — это часто "черный ящик"), мы используем алгоритм SHAP (Explainable AI).
+2. Данные и фокус исследования (Scope)
+Изначальный план: Сделать анализ по всем странам БРИКС.
+Реальность: Алгоритмам ML нужны качественные данные. По Индии, Бразилии и ЮАР данных либо ничтожно мало, либо в них огромные "дыры".
+Финальный фокус: Мы осознанно сузили работу до сравнительного анализа России и Китая.
+Россия: Экономика с дорогим капиталом (высокая ставка, изоляция). Выборка: база SPARK, ~10 000 действующих компаний, ~200 дефолтов.
+Китай: Экономика с колоссальной господдержкой IT. Выборка: база WIND, ~319 действующих компаний, ~37 проблемных.
+Период данных: С 2012 (или 2014) по 2024 год. Важно: 2025 год полностью исключается из анализа, так как отчетности за него еще нет.
+
+#### 2.1. Research Design (Двухэтапная модель: TTC $\rightarrow$ PIT)
+* **Что это значит:** В финансах нельзя смешивать в одну кучу показатели самой компании (выручка, долг) и макроэкономику (инфляция, ВВП). Если инфляция скакнет до 20%, алгоритм может решить, что *все* компании плохие, и проигнорирует их реальные финансы.
+* **Как это работает:** 
+  * **Шаг 1 (TTC - Through-the-Cycle):** Мы смотрим на компанию "в вакууме". Оцениваем только ее бизнес-модель по финансовой отчетности. Насколько она жизнеспособна?
+  * **Шаг 2 (PIT - Point-in-Time):** Мы берем оценку из первого шага и "выводим компанию на улицу", где идет дождь (инфляция) или светит солнце (рост ВВП). Мы корректируем ее индивидуальный риск с учетом текущей погоды в стране.
+* **Почему это круто:** Потому что именно так строят скоринговые модели в реальных банках (Сбер, ВТБ). Научрук будет счастлив.
+
+#### 2.2. Data Sourcing & Target (Откуда данные и что такое дефолт)
+* **Что это значит:** Мы должны четко сказать алгоритму, кого считать "живым" (0), а кого "мертвым" (1).
+* **Как это работает:** С Россией все просто — банкротство. А вот с Китаем (и базой WIND) засада. Компания может уйти с биржи (делистинг), потому что ее купила другая компания, или она стала частной. Это *не* банкротство. Если мы скормим алгоритму все делистинги как "смерть", он сойдет с ума. Поэтому мы фильтруем данные и оставляем только реальные экономические дефолты.
+
+#### 2.3. Формулы Гипотез (О чем они на самом деле?)
+Ты просил объяснить формулы. Вот их реальный смысл:
+
+* **H1 (Проблема переобучения):**
+  * *Формула:* $AUC_{XGB} > AUC_{Logit}$ **И** $\Delta(AUC_{train} - test)_{Logit} < \Delta(AUC_{train} - test)_{XGB}$
+  * *Перевод:* XGBoost (сложный ML) выдаст более высокую общую точность ($AUC$), чем простая Лог-регрессия. **НО** разница между результатами на тренировке и на реальном тесте ($\Delta$) у Лог-регрессии будет меньше.
+  * *Смысл:* Сложный ML на малом числе дефолтов может "вызубрить" ответы (переобучиться). Лог-регрессия — как стабильный троечник: звезд с неба не хватает, но и на экзамене не провалится. Мы доказываем, что в условиях дефицита дефолтов старые методы иногда надежнее.
+* **H2 (Ликвидность важнее долга):**
+  * *Формула:* $\sum |SHAP_{Ликвидность, НМА}| > \sum |SHAP_{Долг/Капитал}|$
+  * *Перевод:* Суммарная важность фичей (которую покажет алгоритм SHAP) из блока "Ликвидность и Нематериальные активы" будет больше, чем из блока "Кредитная нагрузка".
+  * *Смысл:* Для IT-стартапа главное — чтобы были деньги на счетах (чтобы платить зарплаты программистам) и патенты. Классические банковские метрики закредитованности тут не работают.
+* **H3 (Влияние макроэкономики):**
+  * *Формула:* $AUC (TTC + Macro) > AUC (TTC)$
+  * *Перевод:* Точность двухэтапной модели выше, чем одноэтапной. 
+  * *Смысл:* Учет страны и ее "погоды" (инфляции) реально помогает точнее предсказывать банкротства.
+
+#### 2.4. Очистка данных и Class Weights (Без SMOTE)
+* **Проблема:** У нас 10 000 живых и всего 200 мертвых компаний. Алгоритм просто скажет: "Все живы!" — и будет прав на 98%, но пользы от этого ноль.
+* **Как нельзя делать (SMOTE):** Нельзя искусственно генерировать 9 800 фейковых банкротов. В финансах баланс должен сходиться (Активы = Пассивы). Фейковая компания — это математический мусор.
+* **Как делаем мы (Class Weights):** Мы накладываем "штрафы". Говорим алгоритму: "Если ты ошибешься на живой компании, штраф 1 рубль. Если пропустишь банкрота — штраф 50 рублей". Так алгоритм начинает пристально изучать банкротов, не создавая фейков.
+* **Пропуски:** У живых компаний выкидываем строки с пустыми ячейками (их и так много). У мертвых — берем данные за прошлый год (`Forward-fill`) или ставим нули, потому что нам важен каждый банкрот, мы не можем их удалять.
+
+#### 2.5 и 2.6. Обучение, Валидация и SHAP
+* **Cross-Validation:** Мы не просто один раз тестируем модель, а режем данные на куски и прогоняем много раз. Это доказывает комиссии, что наш результат — не случайность.
+* **SHAP:** ML — это черный ящик. SHAP — это фонарик. Он строит красивые графики, где видно: "Ага, эта компания обанкротилась, потому что у нее упал Cash Flow". Без SHAP комиссия скажет: "Ваш ML — это магия, мы ему не верим".
+
+Thesis Structural Blueprint
+Thesis Title: Assessment of Financial Stability for Technology Companies in Selected Emerging Markets (Evidence from Russia and China) Using Machine Learning Models
+FRONT MATTER
+Abstract
+Table of Contents
+List of Tables / List of Figures
+INTRODUCTION
+Background and Context: The transition to an asset-light digital economy in emerging markets.
+Problem Statement: The inadequacy of traditional leverage-based bankruptcy models (e.g., Altman Z-score) for IT companies, and the challenge of applying ML to severely imbalanced datasets with limited default events.
+Research Objective: To evaluate and predict the financial distress of tech companies by developing localized Machine Learning models, contrasting two distinct economic environments (Russia and China).
+Research Questions (RQs):
+RQ1: What specific financial factors (liquidity, intangibles) determine the stability of IT companies compared to traditional asset-heavy industries?
+RQ2: How do advanced ensemble ML algorithms compare to baseline Logistic Regression concerning predictive power and robustness against overfitting on low-default samples?
+RQ3: How does the feature importance vary between different economic regimes (high-cost capital in Russia vs. state-supported markets in China)?
+Hypotheses:
+H1: Ensemble ML models (Random Forest, XGBoost) yield higher predictive accuracy (ROC-AUC); however, baseline Logistic Regression demonstrates higher stability against overfitting on small-default datasets.
+H2: Liquidity metrics and innovation capacity (Intangible Assets) hold significantly higher predictive weight in the tech sector than traditional financial leverage ratios.
+H3: The inclusion of macroeconomic variables (Point-in-Time calibration) improves the predictive power of models compared to standalone financial (Through-the-Cycle) models.
+Scope and Limitations: Justification for narrowing the empirical BRICS scope down to Russia and China due to severe data sparsity and low data quality in Brazil, India, and South Africa.
+CHAPTER 1. Literature Review and Theoretical Framework
+1.1. Financial Stability and the Tech Sector Specifics: Asset-light models, cash burn rates, and why legacy metrics fail.
+1.2. The Emerging Markets Context: Structural heterogeneity. Why comparing Russia and China provides a robust representation of different capital markets.
+1.3. Defining "Default" in Emerging Markets: Differentiating true economic distress (bankruptcy, forced liquidation) from strategic exits (M&A, voluntary delisting) – crucial for the Chinese market.
+1.4. Evolution of Distress Prediction: Traditional Econometrics (Logit) vs. Machine Learning (RF, XGBoost). Handling the class imbalance problem.
+1.5. Two-Stage Risk Modeling Framework: Theoretical justification for separating intrinsic company risk (Through-the-Cycle / TTC) from macroeconomic shocks (Point-in-Time / PIT).
+1.6. Explainable AI (XAI) in Finance: The black-box problem and the theoretical foundations of SHAP values.
+CHAPTER 2. Research Methodology and Data Design
+2.1. Research Design: A quantitative, two-stage predictive modeling pipeline (TTC 
+→
+→
+ PIT).
+2.2. Data Sourcing and Target Definition:
+Russia (SPARK-Interfax): Active vs. Officially Bankrupt.
+China (WIND): Active vs. "Filtered" Delisted (excluding M&A/voluntary exits).
+Timeframe: 2012/2014 – 2024 (excluding immature 2025 data).
+2.3. Feature Selection: Categorizing predictors into Liquidity, Innovation/Intangibles, Leverage, and Macroeconomic controls.
+2.4. Data Preprocessing Pipeline:
+Missing Values: Drop-NA for Active companies; Forward-fill and Zero-fill for Defaulted companies.
+Class Imbalance Strategy: Strict rejection of SMOTE. Implementation of Cost-Sensitive Learning (Class Weights) in loss functions.
+2.5. Model Specifications: Stage 1 (TTC) using Logit, RF, XGBoost. Stage 2 (PIT) integrating GDP and Inflation.
+2.6. Evaluation Metrics: ROC-AUC, PR-AUC, and Stratified K-Fold Cross-Validation.
+CHAPTER 3. Empirical Results and Discussion
+3.1. Exploratory Data Analysis (EDA): Baseline statistics and correlation matrices for RU and CN datasets.
+3.2. Evaluation of TTC Models (Testing H1): Performance comparison and deep dive into the overfitting phenomenon (Train vs. Test score gaps).
+3.3. Feature Importance and Explainable AI (Testing H2): Utilizing SHAP summary plots to prove the dominance of liquidity and intangibles.
+3.4. Macroeconomic Integration and PIT Models (Testing H3): Evaluating how GDP and inflation impact the baseline TTC scores.
+3.5. Cross-Country Comparative Analysis: Russia vs. China risk profile differences based on SHAP values.
+CONCLUSION
+Summary of Main Findings (Answering RQs and testing Hypotheses).
+Methodological Contributions (Success of Class Weights and TTC/PIT approach).
+Implications for Risk Management and Investors.
+REFERENCES
+APPENDICES

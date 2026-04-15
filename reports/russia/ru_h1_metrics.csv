@@ -1,0 +1,4 @@
+﻿Model,ROC-AUC train,ROC-AUC test,ΔROC,PR-AUC train,PR-AUC test,ΔPR
+Logistic Regression,0.8786,0.837,0.0416,0.0405,0.114,-0.0735
+Random Forest,0.9997,0.8614,0.1383,0.8131,0.0851,0.728
+XGBoost,0.9997,0.8833,0.1164,0.8482,0.0642,0.784

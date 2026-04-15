@@ -1,0 +1,3 @@
+﻿Country,TTC ROC-AUC (test),PIT ROC-AUC (test),ΔROC (PIT − TTC),TTC PR-AUC (test),PIT PR-AUC (test)
+Russia,0.878,0.8821,0.0042,0.0673,0.0437
+China,0.9953,0.9957,0.0004,0.6918,0.7167
