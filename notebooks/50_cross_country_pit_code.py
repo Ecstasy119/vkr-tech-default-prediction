@@ -1,4 +1,5 @@
-# ===== CELL 1 =====import warnings
+# ===== CELL 1 =====
+import warnings
 warnings.filterwarnings('ignore')
 
 import numpy as np
@@ -26,7 +27,8 @@ REPORTS.mkdir(parents=True, exist_ok=True)
 
 YEARS = range(2014, 2025)
 print('Common window:', list(YEARS))
-# ===== CELL 3 =====ru_raw = pd.read_csv(PROCESSED / 'ru_panel_cleaned.csv', encoding='utf-8-sig')
+# ===== CELL 3 =====
+ru_raw = pd.read_csv(PROCESSED / 'ru_panel_cleaned.csv', encoding='utf-8-sig')
 cn_raw = pd.read_csv(PROCESSED / 'cn_panel_enriched.csv', encoding='utf-8-sig')
 
 RU = {
@@ -112,6 +114,26 @@ FEATURE_GROUPS = {
     'Size':          ['log_assets', 'log_revenue'],
 }
 
+# Human-readable labels used in every plot instead of raw underscore names.
+FEATURE_LABELS = {
+    'current_ratio':         'Current ratio (CA / CL)',
+    'cash_to_assets':        'Cash / Total assets',
+    'cash_to_cl':            'Cash / Current liabilities',
+    'wc_to_assets':          'Working capital / Total assets',
+    'intangibles_to_assets': 'Intangibles / Total assets',
+    'debt_to_assets':        'Total debt / Total assets',
+    'debt_to_equity':        'Total debt / Equity',
+    'lt_debt_to_assets':     'Long-term debt / Total assets',
+    'interest_coverage':     'Interest coverage (EBIT / Interest)',
+    'roa':                   'Return on assets (ROA)',
+    'net_margin':            'Net margin (NI / Revenue)',
+    'operating_margin':      'Operating margin (EBIT / Revenue)',
+    'cfo_to_assets':         'Operating cash flow / Total assets',
+    'log_assets':            'log(Total assets)',
+    'log_revenue':           'log(Revenue)',
+}
+FEATURE_LABELS_LIST = [FEATURE_LABELS[f] for f in FEATURES]
+
 def preprocess(panel):
     p = panel[panel['year'].isin(list(YEARS))].copy()
     p[FEATURES] = p[FEATURES].replace([np.inf, -np.inf], np.nan)
@@ -127,7 +149,8 @@ print(f'Russia: {ru.shape}  defaults (row-level, K=2 window) = {int(ru["target"]
 print(f'China:  {cn.shape}   defaults (row-level, K=2 window) = {int(cn["target"].sum())}')
 print(f'Russia companies with target=1: {ru.loc[ru.target==1, "ticker"].nunique()}')
 print(f'China  companies with target=1: {cn.loc[cn.target==1, "ticker"].nunique()}')
-# ===== CELL 5 =====def company_split(panel, test_frac=0.20, seed=RNG):
+# ===== CELL 5 =====
+def company_split(panel, test_frac=0.20, seed=RNG):
     label = panel.groupby('ticker')['target'].max()
     pos = np.array(label[label == 1].index.values, copy=True)
     neg = np.array(label[label == 0].index.values, copy=True)
@@ -148,7 +171,8 @@ print(f'Russia: train={ru_tr.sum()}, test={ru_te.sum()}, '
       f'test defaults={int(ru.loc[ru_te, "target"].sum())}')
 print(f'China:  train={cn_tr.sum()}, test={cn_te.sum()}, '
       f'test defaults={int(cn.loc[cn_te, "target"].sum())}')
-# ===== CELL 7 =====def fit_ttc(panel, tr_mask, te_mask, seed=RNG):
+# ===== CELL 7 =====
+def fit_ttc(panel, tr_mask, te_mask, seed=RNG):
     X = panel[FEATURES].values
     y = panel['target'].values
     y_tr, y_te = y[tr_mask], y[te_mask]
@@ -183,7 +207,8 @@ ttc_tbl = pd.DataFrame({
 }).set_index('Country').round(4)
 ttc_tbl.to_csv(REPORTS / 'h3a_ttc_table.csv', encoding='utf-8-sig')
 ttc_tbl
-# ===== CELL 9 =====def bootstrap_ci(panel, te_mask, model, n_boot=N_BOOTSTRAP, seed=RNG):
+# ===== CELL 9 =====
+def bootstrap_ci(panel, te_mask, model, n_boot=N_BOOTSTRAP, seed=RNG):
     rng = np.random.default_rng(seed)
     te = panel.loc[te_mask].copy()
     tickers = te['ticker'].unique()
@@ -217,7 +242,8 @@ ci_tbl = pd.DataFrame({
 }).set_index('Country')
 ci_tbl.to_csv(REPORTS / 'h3a_ttc_bootstrap_ci.csv', encoding='utf-8-sig')
 ci_tbl
-# ===== CELL 11 =====# REPLACE_WITH_IMF_WEO — before defence replace values below with official IMF WEO data.
+# ===== CELL 11 =====
+# REPLACE_WITH_IMF_WEO — before defence replace values below with official IMF WEO data.
 # IMF WEO download: https://www.imf.org/en/Publications/WEO/weo-database
 # Variables: NGDP_RPCH (Gross domestic product, constant prices), PCPIPCH (Inflation, average consumer prices)
 _MACRO_PLACEHOLDER = {
@@ -243,7 +269,8 @@ macro_cn = load_macro('China')
 ru = ru.merge(macro_ru, on='year', how='left')
 cn = cn.merge(macro_cn, on='year', how='left')
 print('Macro merged (placeholder).')
-# ===== CELL 13 =====def compare_ttc_vs_pit(panel, tr_mask, te_mask, seed=RNG):
+# ===== CELL 13 =====
+def compare_ttc_vs_pit(panel, tr_mask, te_mask, seed=RNG):
     X_ttc = panel[['ttc_score']].values
     X_pit = panel[['ttc_score', 'GDP_Growth', 'Inflation_Rate']].values
     y = panel['target'].values
@@ -274,7 +301,8 @@ pit_tbl = pd.DataFrame([
 pit_tbl.to_csv(REPORTS / 'h3a_pit_vs_ttc.csv', encoding='utf-8-sig')
 print('PIT vs TTC (placeholder-macro — cautious interpretation):')
 pit_tbl
-# ===== CELL 14 =====# Bootstrap CI на ΔROC (PIT−TTC) по компаниям
+# ===== CELL 14 =====
+# Bootstrap CI на ΔROC (PIT−TTC) по компаниям
 def bootstrap_delta(panel, te_mask, p_ttc, p_pit, n_boot=N_BOOTSTRAP, seed=RNG):
     rng = np.random.default_rng(seed)
     te = panel.loc[te_mask].copy()
@@ -299,7 +327,8 @@ print(f'China  ΔROC median={cn_dmed:+.4f}, 95%-CI=[{cn_dci[0]:+.4f}, {cn_dci[1]
 print()
 print('Если CI пересекает 0 — макро-лифт статистически НЕ значим при текущей выборке.')
 print('На defence использовать это как negative result + TODO подключить реальный IMF.')
-# ===== CELL 16 =====def fit_xgb_shap(panel, tr_mask, te_mask, seed=RNG):
+# ===== CELL 16 =====
+def fit_xgb_shap(panel, tr_mask, te_mask, seed=RNG):
     X = panel[FEATURES].values
     y = panel['target'].values
     pos_w = float((y[tr_mask] == 0).sum() / max((y[tr_mask] == 1).sum(), 1))
@@ -330,7 +359,8 @@ groups_df['Russia share'] = (groups_df['Russia Σ|SHAP|'] / groups_df['Russia Σ
 groups_df['China share']  = (groups_df['China Σ|SHAP|']  / groups_df['China Σ|SHAP|'].sum()).round(3)
 groups_df.to_csv(REPORTS / 'h3a_group_importance.csv', encoding='utf-8-sig')
 groups_df
-# ===== CELL 17 =====# Top-3 фичей по каждой стране + плот
+# ===== CELL 17 =====
+# Top-3 фичей по каждой стране + плот
 top_k = 3
 ru_top = ru_fi.head(top_k); cn_top = cn_fi.head(top_k)
 
@@ -350,7 +380,8 @@ compare = pd.DataFrame({
 })
 compare.to_csv(REPORTS / 'h3a_top3_features.csv', index=False, encoding='utf-8-sig')
 compare
-# ===== CELL 18 =====# Визуализация: bar chart долей групп side-by-side
+# ===== CELL 18 =====
+# Визуализация: bar chart долей групп side-by-side
 fig, ax = plt.subplots(figsize=(10, 5))
 order = ['Liquidity', 'Innovation', 'Leverage', 'Profitability', 'Size']
 x = np.arange(len(order))
@@ -360,8 +391,9 @@ ax.bar(x - width/2, [groups_df.loc[g, 'Russia share'] for g in order],
 ax.bar(x + width/2, [groups_df.loc[g, 'China share']  for g in order],
        width, label='China',  color='#C00000')
 ax.set_xticks(x); ax.set_xticklabels(order)
-ax.set_ylabel('Share of Σ|SHAP| (normalized)')
-ax.set_title('H3-A: asymmetric feature-group importance (Russia vs China)')
+ax.set_xlabel('Feature group')
+ax.set_ylabel('Share of total |SHAP| importance (normalized to 1.0 per country)')
+ax.set_title('H3-A — Feature-group importance share: Russia vs China\n(normalized mean |SHAP| from XGBoost)')
 ax.legend()
 for i, g in enumerate(order):
     ax.text(i - width/2, groups_df.loc[g, 'Russia share'],
@@ -372,19 +404,21 @@ plt.tight_layout()
 fig.savefig(REPORTS / 'h3a_group_shares.png', dpi=160, bbox_inches='tight')
 plt.show()
 print('saved -> reports/cross_country/h3a_group_shares.png')
-# ===== CELL 19 =====# SHAP summary side-by-side (для визуальной защиты)
+# ===== CELL 19 =====
+# SHAP summary side-by-side (для визуальной защиты)
 fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 plt.sca(axes[0])
-shap.summary_plot(ru_sv, ru_Xte, feature_names=FEATURES, show=False, plot_size=None)
-axes[0].set_title('Russia — SHAP summary')
+shap.summary_plot(ru_sv, ru_Xte, feature_names=FEATURE_LABELS_LIST, show=False, plot_size=None)
+axes[0].set_title('Russia — feature impact on predicted default risk (SHAP, XGBoost)')
 plt.sca(axes[1])
-shap.summary_plot(cn_sv, cn_Xte, feature_names=FEATURES, show=False, plot_size=None)
-axes[1].set_title('China — SHAP summary')
+shap.summary_plot(cn_sv, cn_Xte, feature_names=FEATURE_LABELS_LIST, show=False, plot_size=None)
+axes[1].set_title('China — feature impact on predicted default risk (SHAP, XGBoost)')
 plt.tight_layout()
 fig.savefig(REPORTS / 'h3a_shap_side_by_side.png', dpi=160, bbox_inches='tight')
 plt.show()
 print('saved -> reports/cross_country/h3a_shap_side_by_side.png')
-# ===== CELL 21 =====ru_dominant = ru_groups.idxmax()
+# ===== CELL 21 =====
+ru_dominant = ru_groups.idxmax()
 cn_dominant = cn_groups.idxmax()
 ru_top_share = groups_df.loc[ru_dominant, 'Russia share']
 cn_top_share = groups_df.loc[cn_dominant, 'China share']
@@ -426,7 +460,8 @@ else:
                f'asymmetry weaker than expected - discuss economically.')
 lines.append(NL + verdict)
 print(verdict)
-# ===== CELL 22 =====summary_path = REPORTS / 'h3a_summary.md'
+# ===== CELL 22 =====
+summary_path = REPORTS / 'h3a_summary.md'
 summary_path.write_text('\n'.join(lines), encoding='utf-8')
 print(f'Summary written: {summary_path}')
 print()

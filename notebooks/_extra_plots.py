@@ -53,6 +53,33 @@ GROUP_COLORS = {'Liquidity': '#2E75B6',
                 'Profitability': '#548235',
                 'Size': '#ED7D31'}
 
+# Human-readable labels used in every plot instead of raw underscore names.
+FEATURE_LABELS = {
+    'current_ratio':         'Current ratio (CA / CL)',
+    'cash_to_assets':        'Cash / Total assets',
+    'cash_to_cl':            'Cash / Current liabilities',
+    'wc_to_assets':          'Working capital / Total assets',
+    'intangibles_to_assets': 'Intangibles / Total assets',
+    'rd_to_revenue':         'R&D expense / Revenue',
+    'debt_to_assets':        'Total debt / Total assets',
+    'debt_to_equity':        'Total debt / Equity',
+    'lt_debt_to_assets':     'Long-term debt / Total assets',
+    'interest_coverage':     'Interest coverage (EBIT / Interest)',
+    'roa':                   'Return on assets (ROA)',
+    'net_margin':            'Net margin (NI / Revenue)',
+    'operating_margin':      'Operating margin (EBIT / Revenue)',
+    'cfo_to_assets':         'Operating cash flow / Total assets',
+    'log_assets':            'log(Total assets)',
+    'log_revenue':           'log(Revenue)',
+}
+GROUP_LABELS = {
+    'Liquidity':     'Liquidity (cash & working capital)',
+    'Innovation':    'Innovation (intangibles, R&D)',
+    'Leverage':      'Leverage (debt burden)',
+    'Profitability': 'Profitability (ROA, margins)',
+    'Size':          'Size (log assets / revenue)',
+}
+
 
 # ---------- feature builders ----------------------------------------------
 def build_russia_features(df: pd.DataFrame):
@@ -192,8 +219,9 @@ def plot_roc(models, Xte, yte, title, out):
         auc = roc_auc_score(yte, p)
         ax.plot(fpr, tpr, label=f'{name} (AUC={auc:.3f})',
                 color=MODEL_COLORS[name], lw=2)
-    ax.plot([0, 1], [0, 1], '--', color='grey', lw=1, label='Random')
-    ax.set_xlabel('False Positive Rate'); ax.set_ylabel('True Positive Rate')
+    ax.plot([0, 1], [0, 1], '--', color='grey', lw=1, label='Random classifier')
+    ax.set_xlabel('False positive rate (1 − specificity)')
+    ax.set_ylabel('True positive rate (recall / sensitivity)')
     ax.set_title(title); ax.legend(loc='lower right', fontsize=9)
     plt.tight_layout()
     fig.savefig(out, dpi=160, bbox_inches='tight'); plt.close(fig)
@@ -209,8 +237,9 @@ def plot_pr(models, Xte, yte, title, out):
         ax.plot(rc, pr, label=f'{name} (AP={ap:.3f})',
                 color=MODEL_COLORS[name], lw=2)
     ax.axhline(prev, ls='--', color='grey', lw=1,
-               label=f'Baseline = prevalence ({prev*100:.2f}%)')
-    ax.set_xlabel('Recall'); ax.set_ylabel('Precision')
+               label=f'Baseline = default prevalence ({prev*100:.2f}%)')
+    ax.set_xlabel('Recall (share of true defaults caught)')
+    ax.set_ylabel('Precision (share of flagged firms that truly defaulted)')
     ax.set_title(title); ax.legend(loc='upper right', fontsize=9)
     ax.set_ylim(0, 1.0)
     plt.tight_layout()
@@ -227,17 +256,21 @@ def plot_top10_shap(best_model, Xte, feats, groups, title, out):
     imp = np.abs(sv).mean(axis=0)
     order = np.argsort(imp)[-10:]
     sel_feats = [feats[i] for i in order]
+    sel_labels = [FEATURE_LABELS.get(f, f) for f in sel_feats]
     sel_imp = imp[order]
     feat2grp = {f: g for g, lst in groups.items() for f in lst}
     colors = [GROUP_COLORS[feat2grp[f]] for f in sel_feats]
 
-    fig, ax = plt.subplots(figsize=(7.5, 5.2))
-    ax.barh(sel_feats, sel_imp, color=colors)
-    ax.set_xlabel('mean |SHAP|'); ax.set_title(title)
+    fig, ax = plt.subplots(figsize=(8.5, 5.2))
+    ax.barh(sel_labels, sel_imp, color=colors)
+    ax.set_xlabel('Mean |SHAP value| — average impact on predicted default probability')
+    ax.set_ylabel('Financial ratio')
+    ax.set_title(title)
     from matplotlib.patches import Patch
-    handles = [Patch(color=c, label=g) for g, c in GROUP_COLORS.items()
+    handles = [Patch(color=c, label=GROUP_LABELS.get(g, g))
+               for g, c in GROUP_COLORS.items()
                if g in {feat2grp[f] for f in sel_feats}]
-    ax.legend(handles=handles, loc='lower right', fontsize=8)
+    ax.legend(handles=handles, loc='lower right', fontsize=8, title='Feature group')
     plt.tight_layout()
     fig.savefig(out, dpi=160, bbox_inches='tight'); plt.close(fig)
     return sv, imp
@@ -255,11 +288,12 @@ def plot_confusion(best_model, Xte, yte, title, out):
             best_f1 = f1; best_thr = thr
     pred = (p >= best_thr).astype(int)
     cm = confusion_matrix(yte, pred)
-    fig, ax = plt.subplots(figsize=(5, 4.5))
+    fig, ax = plt.subplots(figsize=(5.2, 4.5))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False,
-                xticklabels=['Pred 0', 'Pred 1'],
-                yticklabels=['True 0', 'True 1'], ax=ax)
-    ax.set_title(f'{title}\nthreshold={best_thr:.2f}, F1={best_f1:.3f}')
+                xticklabels=['Predicted: Active', 'Predicted: Default'],
+                yticklabels=['Actual: Active', 'Actual: Default'], ax=ax)
+    ax.set_xlabel('Model prediction'); ax.set_ylabel('Ground truth')
+    ax.set_title(f'{title}\n(decision threshold = {best_thr:.2f}, F1 = {best_f1:.3f})')
     plt.tight_layout()
     fig.savefig(out, dpi=160, bbox_inches='tight'); plt.close(fig)
     return best_thr, best_f1, cm
@@ -274,11 +308,11 @@ def plot_calibration(best_model, Xte, yte, title, out):
     except ValueError:
         prob_true, prob_pred = calibration_curve(yte, p, n_bins=5, strategy='quantile')
     fig, ax = plt.subplots(figsize=(6, 5))
-    ax.plot([0, 1], [0, 1], '--', color='grey', label='Perfect')
-    ax.plot(prob_pred, prob_true, 'o-', color='#C00000', label='Model')
-    ax.set_xlabel('Mean predicted probability')
-    ax.set_ylabel('Fraction of positives')
-    ax.set_title(title); ax.legend()
+    ax.plot([0, 1], [0, 1], '--', color='grey', label='Perfect calibration')
+    ax.plot(prob_pred, prob_true, 'o-', color='#C00000', label='Model (quantile bins)')
+    ax.set_xlabel('Mean predicted default probability (per bin)')
+    ax.set_ylabel('Observed default rate (per bin)')
+    ax.set_title(title); ax.legend(loc='upper left')
     plt.tight_layout()
     fig.savefig(out, dpi=160, bbox_inches='tight'); plt.close(fig)
 
@@ -304,13 +338,18 @@ def plot_cv_box(X, y, grp, models_proto, title, out):
                          'PR-AUC': average_precision_score(y[te], pr)})
     cv_df = pd.DataFrame(rows)
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+    metric_titles = {
+        'ROC-AUC': 'ROC-AUC across 5 folds (StratifiedGroupKFold CV by company)',
+        'PR-AUC':  'PR-AUC across 5 folds (StratifiedGroupKFold CV by company)',
+    }
     for ax, metric in zip(axes, ['ROC-AUC', 'PR-AUC']):
         sns.boxplot(data=cv_df, x='Model', y=metric, ax=ax,
                     palette=[MODEL_COLORS[n] for n in cv_df['Model'].unique()])
         sns.stripplot(data=cv_df, x='Model', y=metric, ax=ax,
                       color='black', size=4, alpha=0.6)
-        ax.set_title(f'{metric} — 5-fold StratifiedGroupKFold')
+        ax.set_title(metric_titles[metric])
         ax.set_xlabel('')
+        ax.set_ylabel(f'{metric} on held-out fold')
     plt.suptitle(title, y=1.02)
     plt.tight_layout()
     fig.savefig(out, dpi=160, bbox_inches='tight'); plt.close(fig)
@@ -400,14 +439,16 @@ cmp_norm['K=2 share'] = cmp['K=2'] / cmp['K=2'].sum()
 fig, ax = plt.subplots(figsize=(8, 4.8))
 idx = np.arange(len(cmp_norm))
 w = 0.35
-ax.bar(idx - w/2, cmp_norm['K=1 share'], w, label='K=1 (last year only)',
-       color='#2E75B6')
-ax.bar(idx + w/2, cmp_norm['K=2 share'], w, label='K=2 (last 2 years)',
-       color='#C00000')
-ax.set_xticks(idx); ax.set_xticklabels(cmp_norm.index, rotation=20)
-ax.set_ylabel('Share of total Σ|SHAP|')
-ax.set_title('Russia — SHAP group share: K=1 vs K=2 (normalized)')
-ax.legend()
+ax.bar(idx - w/2, cmp_norm['K=1 share'], w,
+       label='K = 1 window (only the last year before default)', color='#2E75B6')
+ax.bar(idx + w/2, cmp_norm['K=2 share'], w,
+       label='K = 2 window (last 2 years before default)', color='#C00000')
+ax.set_xticks(idx)
+ax.set_xticklabels([GROUP_LABELS.get(g, g) for g in cmp_norm.index], rotation=20, ha='right')
+ax.set_xlabel('Feature group')
+ax.set_ylabel('Share of total |SHAP| importance (normalized to 1.0 per window)')
+ax.set_title('Russia — Feature-group importance share: 1-year vs 2-year default window\n(robustness check for the K=2 labeling choice)')
+ax.legend(title='Default-labeling window')
 plt.tight_layout()
 out = ROOT / 'reports/russia_k1/extras/ru_k1_vs_k2_group_shares.png'
 fig.savefig(out, dpi=160, bbox_inches='tight'); plt.close(fig)
@@ -428,9 +469,11 @@ df_year['k2'] = ((df_year['bankrupt_company'] == 1) &
 yr = df_year.groupby('year')[['k1', 'k2']].sum().astype(int)
 fig, ax = plt.subplots(figsize=(9, 4.8))
 yr.plot.bar(ax=ax, color=['#2E75B6', '#C00000'], width=0.85)
-ax.set_ylabel('Positive labels (company-year)')
-ax.set_title('Russia — distribution of defaults by year: K=1 vs K=2 window')
-ax.legend(['K=1 (last year)', 'K=2 (last 2 years)'])
+ax.set_xlabel('Reporting year')
+ax.set_ylabel('Number of company-year rows labeled as Default')
+ax.set_title('Russia — Default-labeled observations per year:\n1-year window (K=1) vs 2-year window (K=2)')
+ax.legend(['K = 1 (only last year before default)', 'K = 2 (last 2 years before default)'],
+          title='Default-labeling window')
 plt.xticks(rotation=0)
 plt.tight_layout()
 out = ROOT / 'reports/russia_k1/extras/ru_defaults_by_year.png'

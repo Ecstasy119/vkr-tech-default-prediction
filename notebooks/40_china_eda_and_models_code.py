@@ -1,4 +1,5 @@
-# ===== CELL 1 =====import warnings
+# ===== CELL 1 =====
+import warnings
 warnings.filterwarnings('ignore')
 
 import numpy as np
@@ -40,7 +41,8 @@ print('Shape:', df.shape)
 print('Tickers per target:', df.groupby('target')['ticker'].nunique().to_dict())
 df.head(3)
 
-# ===== CELL 3 =====TARGET = 'target'
+# ===== CELL 3 =====
+TARGET = 'target'
 ID_COL = 'ticker'
 
 A, CA, CASH, INT_A = 'total_assets', 'current_assets', 'cash', 'intangibles'
@@ -95,6 +97,27 @@ FEATURE_GROUPS = {
     'Size':          ['log_assets', 'log_revenue'],
 }
 
+# Human-readable labels used in every plot instead of raw underscore names.
+FEATURE_LABELS = {
+    'current_ratio':         'Current ratio (CA / CL)',
+    'cash_to_assets':        'Cash / Total assets',
+    'cash_to_cl':            'Cash / Current liabilities',
+    'wc_to_assets':          'Working capital / Total assets',
+    'intangibles_to_assets': 'Intangibles / Total assets',
+    'rd_to_revenue':         'R&D expense / Revenue',
+    'debt_to_assets':        'Total debt / Total assets',
+    'debt_to_equity':        'Total debt / Equity',
+    'lt_debt_to_assets':     'Long-term debt / Total assets',
+    'interest_coverage':     'Interest coverage (EBIT / Interest)',
+    'roa':                   'Return on assets (ROA)',
+    'net_margin':            'Net margin (NI / Revenue)',
+    'operating_margin':      'Operating margin (EBIT / Revenue)',
+    'cfo_to_assets':         'Operating cash flow / Total assets',
+    'log_assets':            'log(Total assets)',
+    'log_revenue':           'log(Revenue)',
+}
+FEATURE_LABELS_LIST = [FEATURE_LABELS[f] for f in FEATURES]
+
 panel[FEATURES] = panel[FEATURES].replace([np.inf, -np.inf], np.nan)
 for c in FEATURES:
     lo, hi = panel[c].quantile([0.01, 0.99])
@@ -105,7 +128,8 @@ panel[FEATURES + [TARGET]].describe().T.round(3).to_csv(REPORTS / 'cn_feature_st
 print(f'Фичи: {len(FEATURES)}  |  stats -> reports/china/cn_feature_stats.csv')
 panel[FEATURES].describe().T.round(3)
 
-# ===== CELL 5 =====vc = panel[TARGET].value_counts()
+# ===== CELL 5 =====
+vc = panel[TARGET].value_counts()
 n_active  = int(vc.get(0, 0))
 n_default = int(vc.get(1, 0))
 ratio = n_default / (n_active + n_default)
@@ -113,8 +137,11 @@ counts = pd.Series({'Active (0)': n_active, 'Default (1)': n_default})
 
 fig, ax = plt.subplots(figsize=(6, 4))
 bars = ax.bar(counts.index, counts.values, color=['#2E75B6', '#C00000'])
-ax.set_title(f'Class distribution — China (imbalance ≈ 1:{n_active//max(n_default,1)})')
-ax.set_ylabel('rows (company-year)')
+ax.set_title(
+    f'Target class balance — China\n'
+    f'Active vs Default companies (imbalance ≈ 1:{n_active//max(n_default,1)})'
+)
+ax.set_ylabel('Number of company-year observations')
 for b, v in zip(bars, counts.values):
     ax.text(b.get_x()+b.get_width()/2, v, f'{v:,}', ha='center', va='bottom')
 plt.tight_layout()
@@ -123,26 +150,34 @@ save_fig(fig, '01_class_distribution'); plt.show()
 log(f'\n## Class balance\n* Active (0): **{n_active:,}**')
 log(f'* Default (1): **{n_default:,}**')
 log(f'* Positive share: **{ratio*100:.3f}%**  (≈ 1:{n_active//max(n_default,1)})')
-# ===== CELL 7 =====panel['_lbl'] = panel[TARGET].map({0:'Active', 1:'Default'})
+# ===== CELL 7 =====
+panel['_lbl'] = panel[TARGET].map({0:'Active', 1:'Default'})
 show = ['current_ratio', 'intangibles_to_assets', 'debt_to_assets', 'roa']
 
 fig, axes = plt.subplots(2, 2, figsize=(11, 7))
 for ax, col in zip(axes.ravel(), show):
     sns.violinplot(data=panel, x='_lbl', y=col, ax=ax,
                    palette={'Active':'#2E75B6','Default':'#C00000'}, cut=0)
-    ax.set_title(col); ax.set_xlabel('')
-plt.suptitle('Distributions by class (winsorized 1–99%)', y=1.02)
+    ax.set_title(FEATURE_LABELS.get(col, col))
+    ax.set_xlabel('Company status'); ax.set_ylabel('Ratio value')
+plt.suptitle('Key financial ratios — Active vs Default companies (winsorized 1–99%)', y=1.02)
 plt.tight_layout()
 save_fig(fig, '02_violin_by_class'); plt.show()
 
 med = panel.groupby('_lbl')[show].median().round(3)
 med.to_csv(REPORTS / 'cn_medians_by_class.csv', encoding='utf-8-sig')
 med
-# ===== CELL 9 =====corr = panel[FEATURES].corr()
-fig, ax = plt.subplots(figsize=(11, 9))
-sns.heatmap(corr, cmap='coolwarm', center=0, annot=True, fmt='.2f',
-            square=True, cbar_kws={'shrink':0.7}, annot_kws={'size':7}, ax=ax)
-ax.set_title('Feature correlation matrix — China')
+# ===== CELL 9 =====
+corr = panel[FEATURES].corr()
+corr_display = corr.rename(index=FEATURE_LABELS, columns=FEATURE_LABELS)
+fig, ax = plt.subplots(figsize=(12, 10))
+sns.heatmap(corr_display, cmap='coolwarm', center=0, annot=True, fmt='.2f',
+            square=True, cbar_kws={'shrink':0.7, 'label':'Pearson correlation'},
+            annot_kws={'size':7}, ax=ax)
+ax.set_title('Pairwise correlation between financial ratios — China')
+ax.set_xlabel(''); ax.set_ylabel('')
+plt.xticks(rotation=45, ha='right')
+plt.yticks(rotation=0)
 plt.tight_layout()
 save_fig(fig, '03_correlation_heatmap'); plt.show()
 
@@ -153,7 +188,8 @@ pairs = [(i,j,corr.loc[i,j]) for i in corr.index for j in corr.columns if i<j an
 print('|corr| > 0.85:')
 for p in pairs: print(f'  {p[0]} × {p[1]}: {p[2]:+.2f}')
 if not pairs: print('  нет — мультиколлинеарность под контролем')
-# ===== CELL 11 =====X = panel[FEATURES].values
+# ===== CELL 11 =====
+X = panel[FEATURES].values
 y = panel[TARGET].values
 groups = panel[ID_COL].values
 
@@ -189,7 +225,8 @@ print(f'Companies — train: {len(train_ids):,}, test: {len(test_ids):,}, '
       f'overlap: {len(train_ids & test_ids)} (должно быть 0)')
 print(f'Default companies — train: {len(train_d)}, test: {len(test_d)}')
 
-# ===== CELL 13 =====POS_WEIGHT = float((y_train == 0).sum() / max((y_train == 1).sum(), 1))
+# ===== CELL 13 =====
+POS_WEIGHT = float((y_train == 0).sum() / max((y_train == 1).sum(), 1))
 print(f'POS_WEIGHT (n_neg / n_pos на train) = {POS_WEIGHT:.1f}')
 
 logit = Pipeline([
@@ -213,7 +250,8 @@ for name, m in models.items():
     m.fit(X_train, y_train)
     print(f'OK trained {name}')
 
-# ===== CELL 15 =====from sklearn.base import clone
+# ===== CELL 15 =====
+from sklearn.base import clone
 
 def scores(model, X, y):
     if hasattr(model, 'predict_proba'):
@@ -277,7 +315,8 @@ print(f'\n{n_splits}-fold Stratified Group K-Fold CV:')
 print(cv)
 res
 
-# ===== CELL 16 =====best_test_roc = res['ROC-AUC test'].idxmax()
+# ===== CELL 16 =====
+best_test_roc = res['ROC-AUC test'].idxmax()
 logit_delta = res.loc['Logistic Regression', 'ΔROC']
 ens_delta_max = res.loc[['Random Forest','XGBoost'], 'ΔROC'].max()
 ens_test_max  = res.loc[['Random Forest','XGBoost'], 'ROC-AUC test'].max()
@@ -301,7 +340,8 @@ else:
     verdict = '❌ H1 НЕ подтверждается: ансамбли не дают прироста и не хуже по зазору.'
 log(f'\n{verdict}')
 print('\n' + verdict)
-# ===== CELL 18 =====# BEST_ENSEMBLE_V2 — выбираем по PR-AUC test (адекватная метрика при дисбалансе, как в 20_russia)
+# ===== CELL 18 =====
+# BEST_ENSEMBLE_V2 — выбираем по PR-AUC test (адекватная метрика при дисбалансе, как в 20_russia)
 ensemble_pr = res.loc[['Random Forest', 'XGBoost'], 'PR-AUC test']
 best_name = ensemble_pr.idxmax()
 best_model = models[best_name]
@@ -317,11 +357,16 @@ elif hasattr(sv, 'ndim') and sv.ndim == 3:
 print('SHAP shape:', sv.shape)
 
 plt.figure()
-shap.summary_plot(sv, X_test, feature_names=FEATURES, show=False)
+shap.summary_plot(sv, X_test, feature_names=FEATURE_LABELS_LIST, show=False)
 fig = plt.gcf()
+fig.suptitle(
+    f'China — feature impact on predicted default risk (SHAP, {best_name})',
+    y=1.02, fontsize=12,
+)
 save_fig(fig, '04_shap_summary'); plt.show()
 
-# ===== CELL 19 =====mean_abs = np.abs(sv).mean(axis=0)
+# ===== CELL 19 =====
+mean_abs = np.abs(sv).mean(axis=0)
 fi = pd.Series(mean_abs, index=FEATURES).sort_values(ascending=False)
 fi.round(4).to_csv(REPORTS / 'cn_shap_feature_importance.csv', header=['mean_abs_shap'], encoding='utf-8-sig')
 print('Top features by mean |SHAP|:')
@@ -339,8 +384,9 @@ lev     = group_df.get('Leverage',   0)
 fig, ax = plt.subplots(figsize=(6, 4))
 bars = ax.bar(['Liquidity + Innovation', 'Leverage'],
               [liq_inn, lev], color=['#2E75B6', '#C00000'])
-ax.set_ylabel('Σ mean |SHAP|')
-ax.set_title('H2: feature-group importance — China')
+ax.set_ylabel('Sum of mean |SHAP| (group impact on default risk)')
+ax.set_title('H2 — Liquidity + Innovation vs Leverage (China, SHAP group importance)')
+ax.set_xlabel('Feature group')
 for b, v in zip(bars, [liq_inn, lev]):
     ax.text(b.get_x()+b.get_width()/2, v, f'{v:.3f}', ha='center', va='bottom')
 plt.tight_layout()
@@ -359,7 +405,8 @@ else:
     verdict2 = '❌ H2 НЕ подтверждается (Китай): рычаг остаётся доминирующим предиктором.'
 log(f'\n{verdict2}')
 print('\n' + verdict2)
-# ===== CELL 21 =====logit_proba = models['Logistic Regression'].predict_proba(X)[:, 1]
+# ===== CELL 21 =====
+logit_proba = models['Logistic Regression'].predict_proba(X)[:, 1]
 best_proba  = best_model.predict_proba(X)[:, 1]
 
 scores_df = panel[['ticker', 'company_name', 'year', TARGET, 'source_class']].copy()
@@ -369,7 +416,8 @@ scores_df['ttc_best_model'] = best_name
 scores_df.to_csv(REPORTS / 'cn_ttc_scores.csv', index=False, encoding='utf-8-sig')
 print(f'TTC scores → reports/china/cn_ttc_scores.csv  ({len(scores_df):,} rows)')
 scores_df.head()
-# ===== CELL 23 =====summary_path = REPORTS / 'cn_summary.md'
+# ===== CELL 23 =====
+summary_path = REPORTS / 'cn_summary.md'
 summary_path.write_text('\n'.join(_report_lines), encoding='utf-8')
 print(f'✅ Итоговый отчёт: {summary_path}')
 print('\nВсе артефакты в reports/china/:')

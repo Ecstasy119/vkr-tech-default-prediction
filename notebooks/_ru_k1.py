@@ -130,6 +130,26 @@ FEATURE_GROUPS = {
     'Size': ['log_assets', 'log_revenue'],
 }
 
+# Human-readable labels used in every plot instead of raw underscore names.
+FEATURE_LABELS = {
+    'current_ratio':         'Current ratio (CA / CL)',
+    'cash_to_assets':        'Cash / Total assets',
+    'cash_to_cl':            'Cash / Current liabilities',
+    'wc_to_assets':          'Working capital / Total assets',
+    'intangibles_to_assets': 'Intangibles / Total assets',
+    'debt_to_assets':        'Total debt / Total assets',
+    'debt_to_equity':        'Total debt / Equity',
+    'lt_debt_to_assets':     'Long-term debt / Total assets',
+    'interest_coverage':     'Interest coverage (EBIT / Interest)',
+    'roa':                   'Return on assets (ROA)',
+    'net_margin':            'Net margin (NI / Revenue)',
+    'operating_margin':      'Operating margin (EBIT / Revenue)',
+    'cfo_to_assets':         'Operating cash flow / Total assets',
+    'log_assets':            'log(Total assets)',
+    'log_revenue':           'log(Revenue)',
+}
+FEATURE_LABELS_LIST = [FEATURE_LABELS[f] for f in FEATURES]
+
 p[FEATURES] = p[FEATURES].replace([np.inf, -np.inf], np.nan)
 for c in FEATURES:
     lo, hi = p[c].quantile([0.01, 0.99])
@@ -305,8 +325,9 @@ else:
 fig, ax = plt.subplots(figsize=(6.5, 4))
 bars = ax.bar(['Liquidity + Innovation', 'Leverage'],
               [liq_inn, lev], color=['#2E75B6', '#C00000'])
-ax.set_ylabel('Sum mean |SHAP|')
-ax.set_title('Russia K=1: H2 group importance')
+ax.set_ylabel('Sum of mean |SHAP| (group impact on default risk)')
+ax.set_xlabel('Feature group')
+ax.set_title('H2 robustness (Russia, K = 1 window)\nLiquidity + Innovation vs Leverage (SHAP group importance)')
 for b, v in zip(bars, [liq_inn, lev]):
     ax.text(b.get_x() + b.get_width() / 2, v, f'{v:.3f}', ha='center', va='bottom')
 plt.tight_layout()
